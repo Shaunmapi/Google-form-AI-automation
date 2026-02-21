@@ -1,0 +1,267 @@
+{
+  "name": "Gmail Filter: Delete Sales Emails and Highlight Retail Jobs",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "hour": 0,
+              "minute": 5
+            }
+          ]
+        },
+        "filters": {
+          "includeSpamTrash": false
+        }
+      },
+      "id": "9ef83f5d-56f0-4111-b234-df130477d864",
+      "name": "New Email Received",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        256,
+        400
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bJTMg4vaNIKTL49C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Subject: ' + $json.subject + '\\n\\nBody: ' + $json.plainText }} {{ $json.snippet }}{{ $json.To }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are an email classifier. Analyze the email subject and content to categorize it.\n\nRemove any message classified as spam, marketing, promotions, discounts, product listings, or shopping content.\nScan remaining content for job postings and pin only verified or clearly stated open positions in retail or sales fields.\nDo not pin internships, scams, or unrelated industries."
+        }
+      },
+      "id": "9dadb8cf-5aa3-4656-9856-99c3a49df57e",
+      "name": "Classify Email",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "sales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5e7a368d-df52-48f0-ade5-d1c253aa63dc"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "retail_job",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2404c48d-8a80-4ddd-a198-d767848b08a4"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2295d12d-039b-4509-9b36-febd62214c5a",
+      "name": "Route by Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n\t\"type\": \"object\",\n\t\"properties\": {\n\t\t\"category\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"enum\": [\"sales\", \"retail_job\", \"other\"],\n\t\t\t\"description\": \"Email category\"\n\t\t},\n\t\t\"reasoning\": {\n\t\t\t\"type\": \"string\",\n\t\t\t\"description\": \"Brief explanation for the classification\"\n\t\t}\n\t},\n\t\"required\": [\"category\", \"reasoning\"]\n}"
+      },
+      "id": "a6d02abb-bbfa-425b-9c10-6ddea2a47606",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        624,
+        624
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "messageId": "={{ $('New Email Received').item.json.id }}"
+      },
+      "id": "a3742cf2-a4b2-4613-93cf-90a248405a00",
+      "name": "Delete Sales Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        304
+      ],
+      "webhookId": "a952e29f-aa7b-4400-81e4-896b858b63c0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bJTMg4vaNIKTL49C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $('New Email Received').item.json.id }}",
+        "labelIds": [
+          "STARRED"
+        ]
+      },
+      "id": "a68c49bf-b8f6-48bc-908e-3e40a546b811",
+      "name": "Star Retail Job",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1056,
+        496
+      ],
+      "webhookId": "536bd7c0-b94f-49bd-a198-f5e4edfc4877",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bJTMg4vaNIKTL49C",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        496,
+        624
+      ],
+      "id": "56a49ed9-11ae-4e38-ad20-3db2de4fa9a8",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "PpjxddKAGm1egQ04",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Route by Category": {
+      "main": [
+        [
+          {
+            "node": "Delete Sales Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Star Retail Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Email Received": {
+      "main": [
+        [
+          {
+            "node": "Classify Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Classify Email",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Email": {
+      "main": [
+        [
+          {
+            "node": "Route by Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Email",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "availableInMCP": false
+  },
+  "versionId": "90e78d3a-c198-44b5-8cfe-b51e160295f4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "acac5569ca2c61475c1875f1979c90c224c7fb5a8e08e7d0042ab99928a7e363"
+  },
+  "id": "tXtuu8rw58F8ThVI",
+  "tags": []
+}
